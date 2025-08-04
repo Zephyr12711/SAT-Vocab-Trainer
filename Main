@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAT Vocab Trainer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for sound effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0e7ff; /* Lighter shade of violet */
+        }
+        .flashcard-container {
+            perspective: 1000px;
+        }
+        .flashcard {
+            width: 100%;
+            height: 400px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+            cursor: pointer;
+        }
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+        .flashcard-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 800;
+            transition: background-color 0.3s;
+        }
+        .flashcard-front {
+            background-color: #ffffff;
+            color: #312e81; /* Darker violet */
+        }
+        .flashcard-back {
+            background-color: #6366f1; /* Indigo */
+            color: #ffffff;
+            transform: rotateY(180deg);
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .btn-primary {
+            @apply bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 text-lg sm:text-xl shadow-lg;
+            transform: scale(1);
+            transition: transform 0.2s ease-in-out;
+        }
+        .btn-primary:active {
+            transform: scale(0.95);
+        }
+        .btn-secondary {
+            @apply bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-full transition-all duration-300 text-lg sm:text-xl shadow-md;
+            transform: scale(1);
+            transition: transform 0.2s ease-in-out;
+        }
+        .btn-secondary:active {
+            transform: scale(0.95);
+        }
+        .btn-option {
+            @apply w-full text-left bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-4 px-6 rounded-xl transition-colors duration-200 shadow-sm mb-4;
+            transform: translateY(0);
+            transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+        }
+        .btn-option:active {
+            transform: translateY(2px);
+        }
+        .btn-option.correct {
+            @apply bg-green-500 text-white hover:bg-green-600;
+        }
+        .btn-option.incorrect {
+            @apply bg-red-500 text-white hover:bg-red-600;
+        }
+        .nav-item {
+            @apply text-gray-600 font-semibold py-3 px-6 rounded-full transition-colors duration-200 text-base sm:text-lg;
+        }
+        .nav-item.active {
+            @apply bg-indigo-500 text-white shadow-lg;
+        }
+        .word-list-item {
+            @apply p-6 rounded-2xl mb-4 shadow-sm transition-all duration-200;
+        }
+        .word-list-item:nth-child(even) {
+            background-color: #f3f4f6; /* Light gray for alternating rows */
+        }
+        .word-list-item:nth-child(odd) {
+            background-color: #e5e7eb; /* Slightly darker gray */
+        }
+        .progress-bar-container {
+            @apply w-full bg-gray-200 rounded-full h-4 overflow-hidden;
+        }
+        .progress-bar {
+            @apply h-4 rounded-full bg-indigo-500 transition-all duration-300;
+        }
+        .quiz-sentence {
+            @apply text-xl font-semibold text-gray-800 mb-6;
+        }
+        .quiz-sentence span {
+            @apply text-indigo-600 font-bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <main class="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 flex flex-col items-center space-y-8">
+        <!-- Navigation Tabs -->
+        <nav class="flex justify-center w-full space-x-2 sm:space-x-4 flex-wrap">
+            <button id="nav-flashcards" class="nav-item active">Flashcards</button>
+            <button id="nav-quiz" class="nav-item">Quiz</button>
+            <button id="nav-roots" class="nav-item">Roots & Prefixes</button>
+            <button id="nav-word-list" class="nav-item">Word List</button>
+        </nav>
+
+        <!-- Flashcards Section -->
+        <div id="flashcard-section" class="w-full" style="display: block;">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Flashcards</h2>
+            <div class="flashcard-container w-full">
+                <div id="flashcard" class="flashcard">
+                    <div id="flashcard-front" class="flashcard-face flashcard-front"></div>
+                    <div id="flashcard-back" class="flashcard-face flashcard-back text-base sm:text-xl md:text-2xl"></div>
+                </div>
+            </div>
+            <div class="w-full flex justify-between items-center space-x-4 mt-8">
+                <button id="prevBtn" class="btn-secondary flex-1">← Previous</button>
+                <button id="shuffleBtn" class="btn-primary flex-1">Shuffle</button>
+                <button id="nextBtn" class="btn-secondary flex-1">Next →</button>
+            </div>
+            <div class="text-center text-lg font-medium text-gray-500 mt-4">
+                <span id="flashcard-progress"></span>
+            </div>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quiz-section" class="w-full" style="display: none;">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">SAT Vocabulary Quiz</h2>
+            <div class="progress-bar-container mb-6">
+                <div id="quiz-progress-bar" class="progress-bar" style="width: 0%;"></div>
+            </div>
+            <div id="quiz-card" class="bg-gray-100 p-8 rounded-2xl shadow-inner w-full">
+                <p id="quiz-question" class="quiz-sentence"></p>
+                <div id="quiz-options" class="flex flex-col items-center">
+                    <!-- Options will be dynamically generated here -->
+                </div>
+                <div id="quiz-feedback" class="text-center mt-4 font-bold text-xl"></div>
+                <button id="quiz-next-btn" class="btn-primary w-full mt-6" style="display: none;">Next Question</button>
+            </div>
+            <div class="text-center text-lg font-medium text-gray-500 mt-4">
+                <span id="quiz-progress-text"></span>
+            </div>
+        </div>
+        
+        <!-- Quiz Results Section -->
+        <div id="results-section" class="w-full" style="display: none;">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Quiz Results</h2>
+            <div class="bg-indigo-500 text-white p-12 rounded-3xl text-center shadow-lg">
+                <p class="text-4xl font-extrabold mb-4">Quiz Complete!</p>
+                <p class="text-6xl font-extrabold mb-6" id="results-score"></p>
+                <p class="text-xl font-semibold" id="results-message"></p>
+            </div>
+            <div class="flex justify-center mt-8">
+                 <button id="results-retake-btn" class="btn-primary w-full max-w-sm">Retake Quiz</button>
+            </div>
+        </div>
+
+        <!-- Roots & Prefixes Section -->
+        <div id="roots-section" class="w-full" style="display: none;">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Roots & Prefixes</h2>
+            <div class="flashcard-container w-full">
+                <div id="roots-card" class="flashcard">
+                    <div id="roots-front" class="flashcard-face flashcard-front text-4xl"></div>
+                    <div id="roots-back" class="flashcard-face flashcard-back text-xl"></div>
+                </div>
+            </div>
+            <div class="w-full flex justify-between items-center space-x-4 mt-8">
+                <button id="roots-prevBtn" class="btn-secondary flex-1">← Previous</button>
+                <button id="roots-shuffleBtn" class="btn-primary flex-1">Shuffle</button>
+                <button id="roots-nextBtn" class="btn-secondary flex-1">Next →</button>
+            </div>
+            <div class="text-center text-lg font-medium text-gray-500 mt-4">
+                <span id="roots-progress"></span>
+            </div>
+        </div>
+        
+        <!-- Word List Section -->
+        <div id="word-list-section" class="w-full" style="display: none;">
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">Complete Word List</h2>
+            <div id="word-list-container" class="word-list-container w-full p-4 bg-gray-100 rounded-2xl shadow-inner max-h-[600px] overflow-y-auto">
+                <!-- Word list will be dynamically generated here -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Use an IIFE to encapsulate the code and prevent global variable conflicts.
+        (function() {
+            // --- Data for the app ---
+            const vocab = [
+                { word: 'Abate', definition: 'to reduce or lessen' },
+                { word: 'Abstract', definition: 'theoretical or existing in thought' },
+                { word: 'Ambiguous', definition: 'unclear or having multiple meanings' },
+                { word: 'Assess', definition: 'to evaluate or judge' },
+                { word: 'Attribute', definition: 'to credit or assign; a characteristic' },
+                { word: 'Comprehensive', definition: 'including everything; thorough' },
+                { word: 'Concede', definition: 'to admit or acknowledge' },
+                { word: 'Subtle', definition: 'delicate, not obvious' },
+                { word: 'Benevolent', definition: 'kind, showing goodwill' },
+                { word: 'Contemptuous', definition: 'showing disdain' },
+                { word: 'Sardonic', definition: 'grimly mocking' },
+                { word: 'Condescending', definition: 'patronizing' },
+                { word: 'Reverent', definition: 'showing deep respect' },
+                { word: 'Compelling', definition: 'forceful, convincing' },
+                { word: 'Refute', definition: 'to disprove' },
+                { word: 'Assert', definition: 'to state forcefully' },
+                { word: 'Substantiate', definition: 'to provide evidence for' },
+                { word: 'Undermine', definition: 'to weaken gradually' },
+                { word: 'Meticulous', definition: 'extremely careful and precise' },
+                { word: 'Candor', definition: 'honesty, frankness' },
+                { word: 'Pragmatic', definition: 'practical, realistic' },
+                { word: 'Discrepancy', definition: 'a difference or inconsistency' },
+                { word: 'Articulate', definition: 'to express clearly' },
+                { word: 'Nuanced', definition: 'having subtle differences' },
+                { word: 'Implicit', definition: 'implied but not directly stated' },
+                { word: 'Paradox', definition: 'a contradictory statement that reveals truth' },
+                { word: 'Synthesis', definition: 'combining parts into a whole' },
+                { word: 'Analogous', definition: 'similar or comparable' },
+                { word: 'Precedent', definition: 'an earlier example that influences later decisions' },
+                { word: 'Empirical', definition: 'based on observation and experiment' },
+                { word: 'Hypothesis', definition: 'a proposed explanation' },
+                { word: 'Variable', definition: 'a factor that can change' },
+                { word: 'Correlation', definition: 'a relationship between variables' },
+                { word: 'Warranted', definition: 'justified; necessary' },
+                { word: 'Exorbitant', definition: 'unreasonably high (typically in price)' },
+                { word: 'Equivocal', definition: 'ambiguous or unclear' },
+                { word: 'Contentious', definition: 'likely to cause argument or controversy' },
+                { word: 'Decried', definition: 'publicly condemned or criticized' },
+                { word: 'Coincidental', definition: 'happening by chance, not planned' },
+                { word: 'Considerate', definition: 'thoughtful of others’ feelings and needs' },
+                { word: 'Infinitesimal', definition: 'extremely small' },
+                { word: 'Tenuous', definition: 'weak, flimsy, or uncertain' },
+                { word: 'Inestimable', definition: 'too great to be calculated' },
+                { word: 'Aesthetic', definition: 'Concerned with beauty or the appreciation of beauty.' },
+                { word: 'Anomalous', definition: 'Deviating from what is standard, normal, or expected.' },
+                { word: 'Capitulate', definition: 'To cease to resist an opponent or an unwelcome demand; to surrender.' },
+                { word: 'Clandestine', definition: 'Kept secret or done secretively.' },
+                { word: 'Debunk', definition: 'To expose the falseness or hollowness of (a myth, idea, or belief).' },
+                { word: 'Ebullient', definition: 'Cheerful and full of energy.' },
+                { word: 'Expedite', definition: 'To make an action or process happen sooner or be accomplished more quickly.' },
+                { word: 'Impetuous', definition: 'Acting or done quickly and without thought or care.' },
+                { word: 'Mundane', definition: 'Lacking interest or excitement; dull.' },
+                { word: 'Nebulous', definition: 'In the form of a cloud or haze; vague or ill-defined.' },
+                { word: 'Opaque', definition: 'Not able to be seen through; not transparent.' },
+                { word: 'Transient', definition: 'Lasting only for a short time; impermanent.' },
+                { word: 'Vacillate', definition: 'To waver between different opinions or actions.' },
+                { word: 'Wary', definition: 'Feeling or showing caution about possible dangers or problems.' },
+                { word: 'Alacrity', definition: 'Brisk and cheerful readiness.' },
+                { word: 'Acrimonious', definition: 'Angry and bitter in a speech or debate.' },
+                { word: 'Ameliorate', definition: 'To make something bad or unsatisfactory better.' },
+                { word: 'Belligerent', definition: 'Hostile and aggressive.' },
+                { word: 'Circumspect', definition: 'Wary and unwilling to take risks.' },
+                { word: 'Copious', definition: 'Abundant in supply or quantity.' },
+                { word: 'Deleterious', definition: 'Causing harm or damage.' },
+                { word: 'Disparate', definition: 'Fundamentally different; not allowing comparison.' },
+                { word: 'Efficacy', definition: 'The ability to produce a desired or intended result.' },
+                { word: 'Egregious', definition: 'Outstandingly bad; shocking.' },
+                { word: 'Elucidate', definition: 'To make something clear; to explain.' },
+                { word: 'Ephemeral', definition: 'Lasting for a very short time.' },
+                { word: 'Fortuitous', definition: 'Happening by chance, especially a lucky chance.' },
+                { word: 'Gregarious', definition: 'Fond of company; sociable.' },
+                { word: 'Harangue', definition: 'A lengthy and aggressive speech.' },
+                { word: 'Inadvertent', definition: 'Not resulting from or achieved through deliberate planning.' },
+                { word: 'Lassitude', definition: 'A state of physical or mental weariness; lack of energy.' },
+                { word: 'Malign', definition: 'To speak about someone in a spitefully critical manner.' },
+                { word: 'Mendacious', definition: 'Not telling the truth; lying.' },
+                { word: 'Nascent', definition: 'Just coming into existence and beginning to display signs of future potential.' },
+                { word: 'Obfuscate', definition: 'To render obscure, unclear, or unintelligible.' },
+                { word: 'Perfidious', definition: 'Deceitful and untrustworthy.' },
+                { word: 'Pernicious', definition: 'Having a harmful effect, especially in a gradual or subtle way.' },
+                { word: 'Recalcitrant', definition: 'Having an obstinately uncooperative attitude.' },
+                { word: 'Salient', definition: 'Most noticeable or important.' },
+                { word: 'Sanctimonious', definition: 'Making a show of being morally superior to other people.' },
+                { word: 'Sycophant', definition: 'A person who acts obsequiously toward someone important to gain advantage.' },
+                { word: 'Tenacious', definition: 'Tending to keep a firm hold of something; persistent.' },
+                { word: 'Vacuous', definition: 'Having or showing a lack of thought or intelligence.' },
+                { word: 'Venerate', definition: 'To regard with great respect.' },
+                { word: 'Assiduous', definition: 'Showing great care and perseverance.' },
+                { word: 'Aversion', definition: 'A strong dislike or a feeling of repugnance.' },
+                { word: 'Bellicose', definition: 'Demonstrating aggression and willingness to fight.' },
+                { word: 'Censure', definition: 'To express severe disapproval of someone or something, especially in a formal statement.' },
+                { word: 'Complacent', definition: 'Showing smug or uncritical satisfaction with oneself or one\'s achievements.' },
+                { word: 'Credulous', definition: 'Having or showing too great a readiness to believe things.' },
+                { word: 'Debilitate', definition: 'To make someone weak and infirm.' },
+                { word: 'Delineate', definition: 'To describe or portray something precisely.' },
+                { word: 'Elicit', definition: 'To evoke or draw out a response, answer, or fact from someone.' },
+                { word: 'Fabricate', definition: 'To invent or concoct something, typically with deceitful intent.' },
+                { word: 'Garrulous', definition: 'Excessively talkative, especially on trivial matters.' },
+                { word: 'Iconoclast', definition: 'A person who attacks cherished beliefs or institutions.' },
+                { word: 'Impugn', definition: 'To dispute the truth, validity, or honesty of a statement or motive.' },
+                { word: 'Inundate', definition: 'To overwhelm someone with things or people to be dealt with.' },
+                { word: 'Juxtapose', definition: 'To place or deal with close together for contrasting effect.' },
+                { word: 'Lackadaisical', definition: 'Lacking enthusiasm and determination; carelessly lazy.' },
+                { word: 'Mitigate', definition: 'To make less severe, serious, or painful.' },
+                { word: 'Oscillate', definition: 'To move or swing back and forth in a regular rhythm.' },
+                { word: 'Paucity', definition: 'The presence of something only in small or insufficient quantities or amounts.' },
+                { word: 'Pedantic', definition: 'Overly concerned with minor details and rules; nit-picking.' },
+                { word: 'Pugnacious', definition: 'Eager or quick to argue, quarrel, or fight.' },
+                { word: 'Retract', definition: 'To draw or be drawn back or back in.' },
+                { word: 'Spurious', definition: 'Not being what it purports to be; false or fake.' },
+                { word: 'Trivial', definition: 'Of little value or importance.' },
+                { word: 'Unilateral', definition: 'Performed by or affecting only one person, group, or country involved in a particular situation, without the agreement of another or the others.' },
+                { word: 'Vindicate', definition: 'To clear someone of blame or suspicion.' }
+            ];
+
+            const satQuestions = [
+                { sentence: 'The politician’s speech was so full of vague promises and half-truths that it seemed designed to ___ rather than to clarify.', correctAnswer: 'obfuscate', incorrectOptions: ['elucidate', 'expedite', 'vindicate'] },
+                { sentence: 'Her enthusiasm was contagious; everyone appreciated her ___ readiness to help with the project.', correctAnswer: 'alacrity', incorrectOptions: ['lassitude', 'aversion', 'complacency'] },
+                { sentence: 'The jury had to consider whether the witness’s statement was a ___ fabrication or a true account of events.', correctAnswer: 'mendacious', incorrectOptions: ['tenacious', 'salient', 'spurious'] },
+                { sentence: 'Despite the criticism, the government refused to ___ its decision, standing firm on the new policy.', correctAnswer: 'retract', incorrectOptions: ['articulate', 'substantiate', 'vindicate'] },
+                { sentence: 'The committee was asked to examine the financial records to determine if there was a ___ between the reported and actual earnings.', correctAnswer: 'discrepancy', incorrectOptions: ['correlation', 'synthesis', 'precedent'] },
+                { sentence: 'His ___ remarks during the debate made it clear he held a low opinion of his opponent.', correctAnswer: 'contemptuous', incorrectOptions: ['reverent', 'benevolent', 'pragmatic'] },
+                { sentence: 'She showed great ___ in admitting her mistake, taking full responsibility for the error.', correctAnswer: 'candor', incorrectOptions: ['belligerence', 'tenacity', 'complacency'] },
+                { sentence: 'The old building was in a ___ state of disrepair, with peeling paint and broken windows.', correctAnswer: 'deleterious', incorrectOptions: ['aesthetic', 'ephemeral', 'mitigating'] },
+                { sentence: 'The company was criticized for its ___ policies, which seemed to benefit only the top executives.', correctAnswer: 'unilateral', incorrectOptions: ['comprehensive', 'pragmatic', 'analogous'] },
+                { sentence: 'His argument was so weak and based on so little evidence that it was considered entirely ___.', correctAnswer: 'tenuous', incorrectOptions: ['compelling', 'warranted', 'substantiated'] },
+                { sentence: 'Despite a serious injury, the athlete showed remarkable ___ and continued to train for the competition.', correctAnswer: 'tenacity', incorrectOptions: ['lassitude', 'complacency', 'equivocation'] },
+                { sentence: 'The principal’s ___ speech at the assembly was meant to inspire, not to scold.', correctAnswer: 'ebullient', incorrectOptions: ['acrimonious', 'sardonic', 'condescending'] },
+                { sentence: 'The documentary sought to ___ the myth that the ancient civilization was technologically primitive.', correctAnswer: 'debunk', incorrectOptions: ['substantiate', 'venerate', 'elucidate'] },
+                { sentence: 'Because he was so ___ about his own accomplishments, people found his stories unbelievable.', correctAnswer: 'mendacious', incorrectOptions: ['gregarious', 'pragmatic', 'meticulous'] },
+                { sentence: 'The artist had a very ___ eye for color and detail, creating beautiful and harmonious works.', correctAnswer: 'aesthetic', incorrectOptions: ['pragmatic', 'mundane', 'ephemeral'] },
+                { sentence: 'The sudden burst of applause was so ___ that it seemed to happen without any clear reason.', correctAnswer: 'coincidental', incorrectOptions: ['anomalous', 'articulate', 'warranted'] },
+                { sentence: 'In order to avoid further conflict, both sides agreed to ___ and sign the treaty.', correctAnswer: 'capitulate', incorrectOptions: ['assert', 'impugn', 'refute'] },
+                { sentence: 'The town meeting became a ___ affair, with angry residents shouting over each other.', correctAnswer: 'contentious', incorrectOptions: ['complacent', 'nuanced', 'pragmatic'] },
+                { sentence: 'The report was a ___ analysis of the company’s finances, leaving no stone unturned.', correctAnswer: 'comprehensive', incorrectOptions: ['ephemeral', 'tenuous', 'spurious'] },
+                { sentence: 'He had a reputation for being an ___, always challenging conventional beliefs and traditions.', correctAnswer: 'iconoclast', incorrectOptions: ['sycophant', 'pragmatist', 'philanthropist'] },
+                { sentence: 'The politician’s speech was so ___ that it could be interpreted in several ways.', correctAnswer: 'ambiguous', incorrectOptions: ['explicit', 'articulate', 'nuanced'] },
+                { sentence: 'Despite the evidence, he continued to ___ the integrity of his opponent, calling his motives into question.', correctAnswer: 'impugn', incorrectOptions: ['vindicate', 'substantiate', 'ameliorate'] },
+                { sentence: 'The company’s ___ growth indicated that it was a promising startup with great potential.', correctAnswer: 'nascent', incorrectOptions: ['obsolete', 'ephemeral', 'recalcitrant'] },
+                { sentence: 'The professor’s lecture was so boring and full of jargon that it seemed designed to ___ the topic rather than clarify it.', correctAnswer: 'obfuscate', incorrectOptions: ['elucidate', 'expedite', 'delineate'] },
+                { sentence: 'His ___ lifestyle made him unpopular with his peers, who found his laziness frustrating.', correctAnswer: 'lackadaisical', incorrectOptions: ['assiduous', 'tenacious', 'meticulous'] },
+                { sentence: 'The teacher’s comments were so ___ that they didn’t offer any real constructive criticism.', correctAnswer: 'vacuous', incorrectOptions: ['nuanced', 'articulate', 'subtle'] },
+                { sentence: 'After a long hike, she felt a profound sense of ___, needing to rest for the remainder of the day.', correctAnswer: 'lassitude', incorrectOptions: ['alacrity', 'efficacy', 'veneration'] },
+                { sentence: 'The detective tried to ___ the full story from the reluctant witness.', correctAnswer: 'elicit', incorrectOptions: ['fabricate', 'mitigate', 'censure'] },
+                { sentence: 'The new evidence seemed to ___ his alibi, making it stronger than before.', correctAnswer: 'substantiate', incorrectOptions: ['refute', 'undermine', 'decry'] },
+                { sentence: 'The company’s sales figures showed an ___ increase during the holiday season.', correctAnswer: 'fortuitous', incorrectOptions: ['perfidious', 'deleterious', 'spurious'] },
+                { sentence: 'The government’s new policy was met with a ___ of disapproval from citizens.', correctAnswer: 'censure', incorrectOptions: ['eulogy', 'acclaim', 'veneration'] },
+                { sentence: 'He was so ___ in his pursuit of the truth that he would not rest until every piece of evidence was examined.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'ephemeral'] },
+                { sentence: 'The scientist’s findings were so controversial that they were ___ by the academic community.', correctAnswer: 'decried', incorrectOptions: ['venerated', 'elucidated', 'vindicated'] },
+                { sentence: 'The artist chose to ___ the city’s industrial skyline with the natural beauty of the park.', correctAnswer: 'juxtapose', incorrectOptions: ['delineate', 'obfuscate', 'ameliorate'] },
+                { sentence: 'Her ___ attitude toward authority figures often got her into trouble.', correctAnswer: 'recalcitrant', incorrectOptions: ['complacent', 'benevolent', 'reverent'] },
+                { sentence: 'The president’s speech was a powerful ___ against the injustices of the legal system.', correctAnswer: 'harangue', incorrectOptions: ['synthesis', 'paradox', 'eulogy'] },
+                { sentence: 'He was known for being a ___, constantly flattering his boss to get a promotion.', correctAnswer: 'sycophant', incorrectOptions: ['iconoclast', 'pragmatist', 'philanthropist'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'The scientist refused to accept the old hypothesis until it could be proven by ___ evidence.', correctAnswer: 'empirical', incorrectOptions: ['abstract', 'theoretical', 'nuanced'] },
+                { sentence: 'His behavior was so ___ that everyone knew he was a spy for the enemy.', correctAnswer: 'perfidious', incorrectOptions: ['gregarious', 'pragmatic', 'meticulous'] },
+                { sentence: 'The lawyer tried to ___ his client from the accusations of fraud.', correctAnswer: 'vindicate', incorrectOptions: ['impugn', 'censure', 'undermine'] },
+                { sentence: 'The charity was founded on a simple, ___ goal: to provide food for the hungry.', correctAnswer: 'pragmatic', incorrectOptions: ['abstract', 'ephemeral', 'aesthetic'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was widely considered a political ___.', correctAnswer: 'vacuous', incorrectOptions: ['synthesis', 'paradox', 'harangue'] },
+                { sentence: 'The students’ ___ questions about the professor’s research showed their genuine interest.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'lackadaisical'] },
+                { sentence: 'The team’s victory was a ___ event that no one had predicted.', correctAnswer: 'fortuitous', incorrectOptions: ['perfidious', 'deleterious', 'spurious'] },
+                { sentence: 'The comedian’s ___ humor was often misunderstood as he made jokes about serious topics.', correctAnswer: 'sardonic', incorrectOptions: ['benevolent', 'reverent', 'complacent'] },
+                { sentence: 'The speaker’s presentation was so clear and concise that it helped to ___ the complex topic.', correctAnswer: 'elucidate', incorrectOptions: ['obfuscate', 'retract', 'decry'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The team’s manager made a ___ decision to bench the star player, a move that proved to be beneficial.', correctAnswer: 'unilateral', incorrectOptions: ['contentious', 'benevolent', 'pragmatic'] },
+                { sentence: 'The student’s essay was a masterful ___ of several different philosophical concepts.', correctAnswer: 'synthesis', incorrectOptions: ['paradox', 'discrepancy', 'anomalous'] },
+                { sentence: 'He had a profound ___ to public speaking, always finding a way to avoid giving presentations.', correctAnswer: 'aversion', incorrectOptions: ['alacrity', 'tenacity', 'gregarious'] },
+                { sentence: 'The team\'s winning streak was a brief, ___ moment of glory, soon forgotten as they began to lose.', correctAnswer: 'ephemeral', incorrectOptions: ['tenacious', 'perpetual', 'salient'] },
+                { sentence: 'The teacher’s ___ tone made it clear that she was not happy with the student’s behavior.', correctAnswer: 'acrimonious', incorrectOptions: ['benevolent', 'reverent', 'ebullient'] },
+                { sentence: 'The professor’s research on the topic was so ___ that it took him years to complete.', correctAnswer: 'meticulous', incorrectOptions: ['lackadaisical', 'complacent', 'transient'] },
+                { sentence: 'The politician’s statement about the economy was so vague and unspecific that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'She was known for her ___ nature, always seeking out new friends and social gatherings.', correctAnswer: 'gregarious', incorrectOptions: ['acrimonious', 'recalcitrant', 'perfidious'] },
+                { sentence: 'The journalist was asked to ___ the facts before publishing the story, to ensure its accuracy.', correctAnswer: 'substantiate', incorrectOptions: ['refute', 'impugn', 'undermine'] },
+                { sentence: 'His ___ remarks were so condescending that they made everyone in the room feel uncomfortable.', correctAnswer: 'condescending', incorrectOptions: ['reverent', 'benevolent', 'pragmatic'] },
+                { sentence: 'He tried to ___ the damage caused by his mistake by offering to help fix the problem.', correctAnswer: 'mitigate', incorrectOptions: ['elucidate', 'expedite', 'debunk'] },
+                { sentence: 'The new policy was so confusing and ill-defined that it seemed to be a total ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The public was so angry about the new tax that they began to ___ the government\'s decision.', correctAnswer: 'decried', incorrectOptions: ['ameliorated', 'venerated', 'expedited'] },
+                { sentence: 'The ___ nature of the politician’s answers made it difficult to discern his true position on the issue.', correctAnswer: 'equivocal', incorrectOptions: ['articulate', 'pragmatic', 'explicit'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The artist chose to ___ the city’s industrial skyline with the natural beauty of the park.', correctAnswer: 'juxtapose', incorrectOptions: ['delineate', 'obfuscate', 'ameliorate'] },
+                { sentence: 'The students’ ___ questions about the professor’s research showed their genuine interest.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'lackadaisical'] },
+                { sentence: 'The team’s victory was a ___ event that no one had predicted.', correctAnswer: 'fortuitous', incorrectOptions: ['perfidious', 'deleterious', 'spurious'] },
+                { sentence: 'The comedian’s ___ humor was often misunderstood as he made jokes about serious topics.', correctAnswer: 'sardonic', incorrectOptions: ['benevolent', 'reverent', 'complacent'] },
+                { sentence: 'The speaker’s presentation was so clear and concise that it helped to ___ the complex topic.', correctAnswer: 'elucidate', incorrectOptions: ['obfuscate', 'retract', 'decry'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The team’s manager made a ___ decision to bench the star player, a move that proved to be beneficial.', correctAnswer: 'unilateral', incorrectOptions: ['contentious', 'benevolent', 'pragmatic'] },
+                { sentence: 'The student’s essay was a masterful ___ of several different philosophical concepts.', correctAnswer: 'synthesis', incorrectOptions: ['paradox', 'discrepancy', 'anomalous'] },
+                { sentence: 'He had a profound ___ to public speaking, always finding a way to avoid giving presentations.', correctAnswer: 'aversion', incorrectOptions: ['alacrity', 'tenacity', 'gregarious'] },
+                { sentence: 'The team\'s winning streak was a brief, ___ moment of glory, soon forgotten as they began to lose.', correctAnswer: 'ephemeral', incorrectOptions: ['tenacious', 'perpetual', 'salient'] },
+                { sentence: 'The teacher’s ___ tone made it clear that she was not happy with the student’s behavior.', correctAnswer: 'acrimonious', incorrectOptions: ['benevolent', 'reverent', 'ebullient'] },
+                { sentence: 'The professor’s research on the topic was so ___ that it took him years to complete.', correctAnswer: 'meticulous', incorrectOptions: ['lackadaisical', 'complacent', 'transient'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'She was known for her ___ nature, always seeking out new friends and social gatherings.', correctAnswer: 'gregarious', incorrectOptions: ['acrimonious', 'recalcitrant', 'perfidious'] },
+                { sentence: 'The journalist was asked to ___ the facts before publishing the story, to ensure its accuracy.', correctAnswer: 'substantiate', incorrectOptions: ['refute', 'impugn', 'undermine'] },
+                { sentence: 'His ___ remarks were so condescending that they made everyone in the room feel uncomfortable.', correctAnswer: 'condescending', incorrectOptions: ['reverent', 'benevolent', 'pragmatic'] },
+                { sentence: 'He tried to ___ the damage caused by his mistake by offering to help fix the problem.', correctAnswer: 'mitigate', incorrectOptions: ['elucidate', 'expedite', 'debunk'] },
+                { sentence: 'The new policy was so confusing and ill-defined that it seemed to be a total ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The public was so angry about the new tax that they began to ___ the government\'s decision.', correctAnswer: 'decried', incorrectOptions: ['ameliorated', 'venerated', 'expedited'] },
+                { sentence: 'The ___ nature of the politician’s answers made it difficult to discern his true position on the issue.', correctAnswer: 'equivocal', incorrectOptions: ['articulate', 'pragmatic', 'explicit'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'He was so ___ in his pursuit of the truth that he would not rest until every piece of evidence was examined.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'transient'] },
+                { sentence: 'The two companies, though seemingly ___, were fundamentally different in their business practices.', correctAnswer: 'analogous', incorrectOptions: ['disparate', 'comprehensive', 'nuanced'] },
+                { sentence: 'The company’s new product was a complete ___, failing to meet any of the consumer’s needs.', correctAnswer: 'fabricate', incorrectOptions: ['ameliorate', 'elucidate', 'mitigate'] },
+                { sentence: 'His ___ nature made him the perfect person to lead the team; he was always ready and willing to start.', correctAnswer: 'alacrity', incorrectOptions: ['lassitude', 'aversion', 'complacency'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The politician’s statement about the economy was so vague and unspecific that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The journalist was asked to ___ the facts before publishing the story, to ensure its accuracy.', correctAnswer: 'substantiate', incorrectOptions: ['refute', 'impugn', 'undermine'] },
+                { sentence: 'His ___ remarks were so condescending that they made everyone in the room feel uncomfortable.', correctAnswer: 'condescending', incorrectOptions: ['reverent', 'benevolent', 'pragmatic'] },
+                { sentence: 'He tried to ___ the damage caused by his mistake by offering to help fix the problem.', correctAnswer: 'mitigate', incorrectOptions: ['elucidate', 'expedite', 'debunk'] },
+                { sentence: 'The new policy was so confusing and ill-defined that it seemed to be a total ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The public was so angry about the new tax that they began to ___ the government\'s decision.', correctAnswer: 'decried', incorrectOptions: ['ameliorated', 'venerated', 'expedited'] },
+                { sentence: 'The ___ nature of the politician’s answers made it difficult to discern his true position on the issue.', correctAnswer: 'equivocal', incorrectOptions: ['articulate', 'pragmatic', 'explicit'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] },
+                { sentence: 'The government’s new policy was so confusing and contradictory that it was considered to be a ___.', correctAnswer: 'paradox', incorrectOptions: ['synthesis', 'correlation', 'precedent'] },
+                { sentence: 'The artist’s work was so well-known that it became a ___ for future painters to follow.', correctAnswer: 'precedent', incorrectOptions: ['discrepancy', 'synthesis', 'paradox'] },
+                { sentence: 'The new evidence was so ___ to the case that it changed the entire course of the trial.', correctAnswer: 'salient', incorrectOptions: ['trivial', 'ephemeral', 'mundane'] },
+                { sentence: 'He had a deep ___ for the elderly, always treating them with the utmost respect.', correctAnswer: 'venerate', incorrectOptions: ['decry', 'impugn', 'censure'] },
+                { sentence: 'The two research papers presented ___ arguments, making it impossible to compare their findings directly.', correctAnswer: 'disparate', incorrectOptions: ['analogous', 'comprehensive', 'nuanced'] },
+                { sentence: 'She showed great ___ in the face of danger, remaining calm and collected.', correctAnswer: 'wary', incorrectOptions: ['impetuous', 'belligerent', 'complacent'] },
+                { sentence: 'The manager’s decision to fire the employee was viewed by some as an ___ abuse of power.', correctAnswer: 'egregious', incorrectOptions: ['pragmatic', 'benevolent', 'subtle'] },
+                { sentence: 'The politician’s speech was so full of vague promises that it was considered to be quite ___.', correctAnswer: 'nebulous', incorrectOptions: ['articulate', 'nuanced', 'comprehensive'] },
+                { sentence: 'The town was so isolated that it was a truly ___ place, unlike any other on the map.', correctAnswer: 'anomalous', incorrectOptions: ['mundane', 'gregarious', 'transient'] },
+                { sentence: 'The professor’s ___ lecture was so detailed and concerned with minute points of grammar that the students fell asleep.', correctAnswer: 'pedantic', incorrectOptions: ['compelling', 'nuanced', 'comprehensive'] },
+                { sentence: 'The new CEO’s first task was to ___ the company’s outdated production process.', correctAnswer: 'expedite', incorrectOptions: ['obfuscate', 'mitigate', 'vacillate'] },
+                { sentence: 'He was known for being an ___ spender, always buying expensive things he didn’t need.', correctAnswer: 'exorbitant', incorrectOptions: ['impetuous', 'parsimonious', 'tenuous'] },
+                { sentence: 'The child was so ___ that he would fight with anyone who disagreed with him.', correctAnswer: 'pugnacious', incorrectOptions: ['benevolent', 'complacent', 'subtle'] },
+                { sentence: 'The detective found a ___ amount of evidence that supported the suspect’s alibi.', correctAnswer: 'copious', incorrectOptions: ['tenuous', 'infinitesimal', 'paucity'] },
+                { sentence: 'The news reporter was praised for her ___ reporting, always telling the truth without bias.', correctAnswer: 'candor', incorrectOptions: ['perfidiousness', 'mendaciousness', 'acrimoniousness'] },
+                { sentence: 'The judge stated that the defendant’s actions were not ___ by the law, and he would be punished accordingly.', correctAnswer: 'warranted', incorrectOptions: ['implicit', 'coincidental', 'expedient'] },
+                { sentence: 'The company’s growth was so rapid that it seemed to ___ its competitors in the market.', correctAnswer: 'undermine', incorrectOptions: ['substantiate', 'vindicate', 'ameliorate'] },
+                { sentence: 'The two countries’ relationship was so ___ that a small disagreement could lead to a major conflict.', correctAnswer: 'tenuous', incorrectOptions: ['belligerent', 'perfidious', 'tenacious'] },
+                { sentence: 'The manager was criticized for being too ___, showing too much satisfaction with the company’s current performance.', correctAnswer: 'complacent', incorrectOptions: ['assiduous', 'recalcitrant', 'tenacious'] },
+                { sentence: 'The public’s anger at the high prices was so palpable that it began to ___.', correctAnswer: 'abate', incorrectOptions: ['accelerate', 'escalate', 'intensify'] },
+                { sentence: 'The political cartoon was a ___ critique of the current administration.', correctAnswer: 'sardonic', incorrectOptions: ['reverent', 'benevolent', 'ebullient'] },
+                { sentence: 'He was so ___ in his work that he would often work late to finish a project.', correctAnswer: 'assiduous', incorrectOptions: ['lackadaisical', 'complacent', 'vacuous'] }
+            ];
+
+            const rootsAndPrefixes = [
+                { term: 'Bene-', definition: 'Prefix meaning "good" or "well"', examples: ['Benevolent', 'Benefit'] },
+                { term: 'In-', definition: 'Prefix meaning "not" or "into"', examples: ['Implicit', 'Inestimable', 'Inadvertent'] },
+                { term: 'Cor-', definition: 'Root meaning "heart" or "together"', examples: ['Correlation', 'Corroborate'] },
+                { term: 'Sub-', definition: 'Prefix meaning "under" or "below"', examples: ['Substantiate', 'Submarine'] },
+                { term: 'Est-', definition: 'Root meaning "to value" or "to estimate"', examples: ['Inestimable', 'Estimate'] },
+                { term: 'Ex-', definition: 'Prefix meaning "out of" or "away from"', examples: ['Exorbitant', 'Expel', 'Elucidate'] },
+                { term: 'Mund-', definition: 'Root meaning "world"', examples: ['Mundane', 'Mundial'] },
+                { term: 'Op-', definition: 'Prefix meaning "against" or "in the way"', examples: ['Opaque', 'Opponent'] },
+                { term: 'Trans-', definition: 'Prefix meaning "across" or "through"', examples: ['Transient', 'Transport'] },
+                { term: 'Vac-', definition: 'Root meaning "empty" or "free"', examples: ['Vacillate', 'Vacuous', 'Vacant'] },
+                { term: 'Acr-', definition: 'Root meaning "sharp, bitter"', examples: ['Acrimonious', 'Acerbic'] },
+                { term: 'Bell-', definition: 'Root meaning "war"', examples: ['Belligerent', 'Rebellion', 'Bellicose'] },
+                { term: 'Circum-', definition: 'Prefix meaning "around"', examples: ['Circumspect', 'Circumference'] },
+                { term: 'Cop-', definition: 'Root meaning "abundance"', examples: ['Copious', 'Cornucopia'] },
+                { term: 'Greg-', definition: 'Root meaning "herd, flock"', examples: ['Gregarious', 'Congregate'] },
+                { term: 'Mal-', definition: 'Root meaning "bad, evil"', examples: ['Malign', 'Malicious'] },
+                { term: 'Ob-', definition: 'Prefix meaning "in the way, against"', examples: ['Obfuscate', 'Obtuse'] },
+                { term: 'Per-', definition: 'Prefix meaning "through"', examples: ['Pernicious', 'Perforate'] },
+                { term: 'Sanc-', definition: 'Root meaning "holy"', examples: ['Sanctimonious', 'Sanctuary'] },
+                { term: 'Ten-', definition: 'Root meaning "hold"', examples: ['Tenacious', 'Tenure'] },
+                { term: 'Ab-', definition: 'Prefix meaning "away from"', examples: ['Abstain', 'Abnormal'] },
+                { term: 'Ad-', definition: 'Prefix meaning "to" or "toward"', examples: ['Adhere', 'Advocate'] },
+                { term: 'An-', definition: 'Prefix meaning "without"', examples: ['Anomalous', 'Anarchy'] },
+                { term: '-ced-', definition: 'Root meaning "go, yield"', examples: ['Concede', 'Recede', 'Precedent'] },
+                { term: '-cred-', definition: 'Root meaning "believe"', examples: ['Credulous', 'Incredulous'] },
+                { term: 'De-', definition: 'Prefix meaning "down, away"', examples: ['Debunk', 'Delineate', 'Degrade'] },
+                { term: 'E/Ex-', definition: 'Prefix meaning "out, from"', examples: ['Elicit', 'Expedite', 'Evoke'] },
+                { term: 'Il/Im/In-', definition: 'Prefix meaning "not"', examples: ['Implicit', 'Inundate', 'Illegible'] },
+                { term: '-gress-', definition: 'Root meaning "step"', examples: ['Progress', 'Regress'] },
+                { term: '-ject-', definition: 'Root meaning "throw"', examples: ['Inject', 'Eject', 'Project'] },
+                { term: 'Juxta-', definition: 'Prefix meaning "next to"', examples: ['Juxtapose', 'Juxtaposition'] },
+                { term: 'Mit-', definition: 'Root meaning "to send"', examples: ['Mitigate', 'Submit'] },
+                { term: 'Oscil-', definition: 'Root meaning "swing"', examples: ['Oscillate', 'Oscillation'] },
+                { term: 'Pau-', definition: 'Root meaning "few, little"', examples: ['Paucity', 'Pauper'] },
+                { term: 'Ped-', definition: 'Root meaning "foot" or "child"', examples: ['Pedestrian', 'Pedantic'] },
+                { term: 'Pugn-', definition: 'Root meaning "fight"', examples: ['Pugnacious', 'Impugn'] },
+                { term: 'Re-', definition: 'Prefix meaning "again" or "back"', examples: ['Refute', 'Retract', 'Reiterate'] },
+                { term: 'Un-', definition: 'Prefix meaning "not" or "opposite of"', examples: ['Unilateral', 'Undermine'] },
+                { term: 'Ver-', definition: 'Root meaning "truth"', examples: ['Verify', 'Veracity'] },
+                { term: 'Vind-', definition: 'Root meaning "force" or "claim"', examples: ['Vindicate', 'Vindication'] },
+                { term: 'Voc-', definition: 'Root meaning "call" or "voice"', examples: ['Vocation', 'Vociferous'] }
+            ];
+
+            // --- DOM Elements ---
+            const flashcardSection = document.getElementById('flashcard-section');
+            const quizSection = document.getElementById('quiz-section');
+            const rootsSection = document.getElementById('roots-section');
+            const wordListSection = document.getElementById('word-list-section');
+            const resultsSection = document.getElementById('results-section');
+            
+            const navFlashcards = document.getElementById('nav-flashcards');
+            const navQuiz = document.getElementById('nav-quiz');
+            const navRoots = document.getElementById('nav-roots');
+            const navWordList = document.getElementById('nav-word-list');
+
+            // Flashcard Elements
+            const flashcard = document.getElementById('flashcard');
+            const flashcardFront = document.getElementById('flashcard-front');
+            const flashcardBack = document.getElementById('flashcard-back');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const shuffleBtn = document.getElementById('shuffleBtn');
+            const flashcardProgress = document.getElementById('flashcard-progress');
+
+            // Quiz Elements
+            const quizQuestionEl = document.getElementById('quiz-question');
+            const quizOptionsEl = document.getElementById('quiz-options');
+            const quizFeedbackEl = document.getElementById('quiz-feedback');
+            const quizNextBtn = document.getElementById('quiz-next-btn');
+            const quizProgressText = document.getElementById('quiz-progress-text');
+            const quizProgressBar = document.getElementById('quiz-progress-bar');
+            
+            // Results Elements
+            const resultsScoreEl = document.getElementById('results-score');
+            const resultsMessageEl = document.getElementById('results-message');
+            const resultsRetakeBtn = document.getElementById('results-retake-btn');
+
+            // Roots Elements
+            const rootsCard = document.getElementById('roots-card');
+            const rootsFront = document.getElementById('roots-front');
+            const rootsBack = document.getElementById('roots-back');
+            const rootsPrevBtn = document.getElementById('roots-prevBtn');
+            const rootsNextBtn = document.getElementById('roots-nextBtn');
+            const rootsShuffleBtn = document.getElementById('roots-shuffleBtn');
+            const rootsProgress = document.getElementById('roots-progress');
+
+            // Word List Elements
+            const wordListContainer = document.getElementById('word-list-container');
+
+
+            // --- State Variables ---
+            let currentFlashcardIndex = 0;
+            let currentQuizIndex = 0;
+            let quizScore = 0;
+            let quizQuestions = [];
+            let currentRootsIndex = 0;
+            const quizLength = 10; // Number of questions per quiz
+
+            // --- Sound Effects using Tone.js ---
+            const correctSynth = new Tone.Synth({
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0, release: 0.2 }
+            }).toDestination();
+            const incorrectSynth = new Tone.Synth({
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.05, decay: 0.2, sustain: 0, release: 0.2 }
+            }).toDestination();
+            
+            function playCorrectSound() {
+                correctSynth.triggerAttackRelease('C5', '8n');
+            }
+            
+            function playIncorrectSound() {
+                incorrectSynth.triggerAttackRelease('C3', '8n');
+            }
+
+            // --- Utility Functions ---
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            function showSection(section) {
+                flashcardSection.style.display = 'none';
+                quizSection.style.display = 'none';
+                rootsSection.style.display = 'none';
+                wordListSection.style.display = 'none';
+                resultsSection.style.display = 'none';
+
+                flashcard.classList.remove('flipped');
+                rootsCard.classList.remove('flipped');
+
+                navFlashcards.classList.remove('active');
+                navQuiz.classList.remove('active');
+                navRoots.classList.remove('active');
+                navWordList.classList.remove('active');
+                
+                if (section === 'flashcards') {
+                    flashcardSection.style.display = 'block';
+                    navFlashcards.classList.add('active');
+                    loadFlashcard();
+                } else if (section === 'quiz') {
+                    quizSection.style.display = 'block';
+                    navQuiz.classList.add('active');
+                    startQuiz();
+                } else if (section === 'roots') {
+                    rootsSection.style.display = 'block';
+                    navRoots.classList.add('active');
+                    loadRootsCard();
+                } else if (section === 'word-list') {
+                    wordListSection.style.display = 'block';
+                    navWordList.classList.add('active');
+                    loadWordList();
+                } else if (section === 'results') {
+                    resultsSection.style.display = 'block';
+                }
+            }
+
+            // --- Flashcard Mode Logic ---
+            function loadFlashcard() {
+                const card = vocab[currentFlashcardIndex];
+                flashcardFront.textContent = card.word;
+                flashcardBack.textContent = card.definition;
+                flashcardProgress.textContent = `Word ${currentFlashcardIndex + 1} of ${vocab.length}`;
+            }
+
+            function navigateFlashcards(direction) {
+                currentFlashcardIndex = (currentFlashcardIndex + direction + vocab.length) % vocab.length;
+                flashcard.classList.remove('flipped');
+                loadFlashcard();
+            }
+
+            function shuffleFlashcards() {
+                shuffleArray(vocab);
+                currentFlashcardIndex = 0;
+                flashcard.classList.remove('flipped');
+                loadFlashcard();
+            }
+
+            // --- Quiz Mode Logic ---
+            function generateSentenceQuizQuestions() {
+                quizQuestions = [];
+                const shuffledQuestions = [...satQuestions];
+                shuffleArray(shuffledQuestions);
+                
+                const numQuestions = Math.min(quizLength, shuffledQuestions.length);
+                for (let i = 0; i < numQuestions; i++) {
+                    const questionData = shuffledQuestions[i];
+                    
+                    const options = [questionData.correctAnswer, ...questionData.incorrectOptions];
+                    shuffleArray(options);
+                    
+                    quizQuestions.push({
+                        sentence: questionData.sentence,
+                        options: options,
+                        correctAnswer: questionData.correctAnswer
+                    });
+                }
+            }
+
+            function startQuiz() {
+                generateSentenceQuizQuestions();
+                currentQuizIndex = 0;
+                quizScore = 0;
+                quizFeedbackEl.textContent = '';
+                quizNextBtn.style.display = 'none';
+                loadQuizQuestion();
+            }
+
+            function loadQuizQuestion() {
+                if (currentQuizIndex >= quizQuestions.length) {
+                    showQuizResults();
+                    return;
+                }
+                
+                const question = quizQuestions[currentQuizIndex];
+                const sentenceHtml = question.sentence.replace('___', '<span class="text-indigo-600 font-bold">___</span>');
+                quizQuestionEl.innerHTML = sentenceHtml;
+                
+                quizOptionsEl.innerHTML = '';
+                quizFeedbackEl.textContent = '';
+                quizNextBtn.style.display = 'none';
+
+                question.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.textContent = option;
+                    button.classList.add('btn-option');
+                    button.addEventListener('click', () => checkAnswer(button, option, question.correctAnswer));
+                    quizOptionsEl.appendChild(button);
+                });
+                
+                updateQuizProgress();
+            }
+
+            function checkAnswer(button, selectedAnswer, correctAnswer) {
+                Array.from(quizOptionsEl.children).forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.textContent === correctAnswer) {
+                        btn.classList.add('correct');
+                    } else if (btn === button) {
+                        btn.classList.add('incorrect');
+                    }
+                });
+
+                if (selectedAnswer === correctAnswer) {
+                    playCorrectSound();
+                    quizFeedbackEl.textContent = 'Great job!';
+                    quizFeedbackEl.classList.remove('text-red-500');
+                    quizFeedbackEl.classList.add('text-green-500');
+                    quizScore++;
+                } else {
+                    playIncorrectSound();
+                    quizFeedbackEl.textContent = `Incorrect. The correct answer was: "${correctAnswer}".`;
+                    quizFeedbackEl.classList.remove('text-green-500');
+                    quizFeedbackEl.classList.add('text-red-500');
+                }
+                quizNextBtn.style.display = 'block';
+            }
+            
+            function updateQuizProgress() {
+                const progressPercentage = ((currentQuizIndex + 1) / quizQuestions.length) * 100;
+                quizProgressBar.style.width = `${progressPercentage}%`;
+                quizProgressText.textContent = `Question ${currentQuizIndex + 1} of ${quizQuestions.length}`;
+            }
+
+            function showQuizResults() {
+                showSection('results');
+                resultsScoreEl.textContent = `${quizScore} / ${quizQuestions.length}`;
+                const scorePercentage = (quizScore / quizQuestions.length) * 100;
+                let message = '';
+                if (scorePercentage >= 90) {
+                    message = 'You are a vocabulary master! Excellent work!';
+                } else if (scorePercentage >= 70) {
+                    message = 'Solid performance! Keep practicing to get even better.';
+                } else if (scorePercentage >= 50) {
+                    message = 'Good start! A little more practice and you\'ll be on your way.';
+                } else {
+                    message = 'You got this! Review the words and try again.';
+                }
+                resultsMessageEl.textContent = message;
+            }
+            
+            function retakeQuiz() {
+                showSection('quiz');
+            }
+            
+            resultsRetakeBtn.addEventListener('click', retakeQuiz);
+            
+            // --- Roots & Prefixes Logic ---
+            function loadRootsCard() {
+                const card = rootsAndPrefixes[currentRootsIndex];
+                rootsFront.innerHTML = `<span class="text-indigo-500 text-6xl font-bold">${card.term}</span>`;
+                rootsBack.innerHTML = `
+                    <div class="flex flex-col space-y-4">
+                        <p class="text-xl font-medium">${card.definition}</p>
+                        <p class="text-lg font-normal">Examples: ${card.examples.join(', ')}</p>
+                    </div>
+                `;
+                rootsProgress.textContent = `Item ${currentRootsIndex + 1} of ${rootsAndPrefixes.length}`;
+            }
+
+            function navigateRoots(direction) {
+                currentRootsIndex = (currentRootsIndex + direction + rootsAndPrefixes.length) % rootsAndPrefixes.length;
+                rootsCard.classList.remove('flipped');
+                loadRootsCard();
+            }
+            
+            function shuffleRoots() {
+                shuffleArray(rootsAndPrefixes);
+                currentRootsIndex = 0;
+                rootsCard.classList.remove('flipped');
+                loadRootsCard();
+            }
+
+            // --- Word List Logic ---
+            function loadWordList() {
+                wordListContainer.innerHTML = '';
+                
+                const sortedVocab = [...vocab].sort((a, b) => a.word.localeCompare(b.word));
+                
+                sortedVocab.forEach(item => {
+                    const listItem = document.createElement('div');
+                    listItem.classList.add('word-list-item');
+                    listItem.innerHTML = `
+                        <h3 class="text-2xl font-semibold text-gray-900">${item.word}</h3>
+                        <p class="text-lg text-gray-600">${item.definition}</p>
+                    `;
+                    wordListContainer.appendChild(listItem);
+                });
+            }
+
+
+            // --- Event Listeners and Initial Load ---
+            navFlashcards.addEventListener('click', () => showSection('flashcards'));
+            navQuiz.addEventListener('click', () => showSection('quiz'));
+            navRoots.addEventListener('click', () => showSection('roots'));
+            navWordList.addEventListener('click', () => showSection('word-list'));
+
+            flashcard.addEventListener('click', () => flashcard.classList.toggle('flipped'));
+            prevBtn.addEventListener('click', () => navigateFlashcards(-1));
+            nextBtn.addEventListener('click', () => navigateFlashcards(1));
+            shuffleBtn.addEventListener('click', shuffleFlashcards);
+
+            rootsCard.addEventListener('click', () => rootsCard.classList.toggle('flipped'));
+            rootsPrevBtn.addEventListener('click', () => navigateRoots(-1));
+            rootsNextBtn.addEventListener('click', () => navigateRoots(1));
+            rootsShuffleBtn.addEventListener('click', shuffleRoots);
+
+            quizNextBtn.addEventListener('click', () => {
+                currentQuizIndex++;
+                loadQuizQuestion();
+            });
+
+            window.onload = () => {
+                showSection('flashcards');
+            };
+        })();
+    </script>
+</body>
+</html>
